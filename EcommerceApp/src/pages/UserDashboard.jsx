@@ -1,11 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import { Search, ShoppingCart, Heart, Star, StarHalf, Store, CheckCircle, XCircle } from 'lucide-react';
+import { useDispatch, useSelector } from 'react-redux';
+import { addToCart } from '../redux/slices/cartSlice';
 import { getAllProducts } from '../services/productService';
-
+import { addToCartAPI } from '../services/cartService';
 
 const UserDashboard = () => {
+    const dispatch = useDispatch();
+    const { user } = useSelector(state => state.auth);
     const [products, setProducts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [quantities, setQuantities] = useState({});
+
+    const handleQuantityChange = (productId, delta, maxStock) => {
+        setQuantities(prev => {
+            const current = prev[productId] || 1;
+            const next = Math.max(1, Math.min(maxStock, current + delta));
+            return { ...prev, [productId]: next };
+        });
+    };
+
+    const handleAddToCartClick = async (product) => {
+        // console.log(product);
+        const productId = product.id || product.Id;
+        const identifier = productId || product.name || product.Name;
+        const qty = quantities[identifier] || 1;
+        const userId = user?.id || user?.Id;
+        const description = product.description || product.Description || '';
+        const cartPayload = {
+            UserId: userId,
+            ProductId: productId,
+            Quantity: qty,
+            Description: description,
+            product: {
+                Id: productId,
+                Name: product.name || product.Name,
+                Price: product.price || product.Price || 0,
+                Description: description,
+                Image: product.image || product.Image || '',
+                Stock: product.stock || product.Stock,
+            }
+        };
+       // console.log("cartPayload", cartPayload);
+        try {
+            if (userId && productId) {
+                await addToCartAPI(userId, productId, qty, description);
+            }
+
+            dispatch(addToCart(cartPayload));
+        }
+        catch (error) {
+            console.warn("API Add to Cart failed. Ensure your backend endpoint /Cart/AddToCart exists.");
+        }
+    };
 
     useEffect(() => {
         const fetchDashboardData = async () => {
@@ -34,24 +81,6 @@ const UserDashboard = () => {
     }, []);
 
 
-
-    // Star Rating Component
-    const renderStars = (rating) => {
-        const stars = [];
-        const fullStars = Math.floor(rating);
-        const hasHalfStar = rating % 1 >= 0.5;
-
-        for (let i = 0; i < 5; i++) {
-            if (i < fullStars) {
-                stars.push(<Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />);
-            } else if (i === fullStars && hasHalfStar) {
-                stars.push(<StarHalf key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />);
-            } else {
-                stars.push(<Star key={i} className="w-4 h-4 text-gray-300" />);
-            }
-        }
-        return <div className="flex items-center gap-0.5">{stars}</div>;
-    };
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -113,107 +142,136 @@ const UserDashboard = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                        {products.map((product) => (
-                            <div
-                                key={product.id || product.Id || Math.random()}
-                                className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl border border-gray-100 transition-all duration-300 flex flex-col"
-                            >
-                                {/* Product Image */}
-                                <div className="relative h-64 w-full bg-gray-50 flex items-center justify-center p-6 overflow-hidden">
-                                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900/5 to-transparent z-10"></div>
-                                    <img
-                                        src={product.image || product.Image || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&q=80"}
-                                        alt={product.name || product.Name}
-                                        className="w-full h-full object-cover rounded-md group-hover:scale-110 transition-transform duration-700 ease-in-out"
-                                        loading="lazy"
-                                    />
-                                    <div className="absolute top-4 right-4 z-20">
-                                        <button className="bg-white/80 backdrop-blur-md text-gray-400 hover:text-rose-500 p-2.5 rounded-full shadow-sm hover:shadow-md transition-all duration-300">
-                                            <Heart className="w-5 h-5 fill-current opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            <Heart className="w-5 h-5 absolute inset-0 m-auto" />
-                                        </button>
-                                    </div>
-
-                                    {(product.stock || product.Stock || 0) <= 5 && (product.stock || product.Stock || 0) > 0 && (
-                                        <div className="absolute top-4 left-4 z-20">
-                                            <span className="bg-amber-500 text-white text-[10px] font-black uppercase tracking-wider py-1.5 px-3 rounded-full shadow-md animate-pulse">
-                                                Only {product.stock || product.Stock} Left
-                                            </span>
+                        {products.map((product, idx) => {
+                            const identifier = product.id || product.Id || product.name || product.Name || idx;
+                            return (
+                                <div
+                                    key={identifier}
+                                    className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl border border-gray-100 transition-all duration-300 flex flex-col"
+                                >
+                                    {/* Product Image */}
+                                    <div className="relative h-64 w-full bg-gray-50 flex items-center justify-center p-6 overflow-hidden">
+                                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900/5 to-transparent z-10"></div>
+                                        <img
+                                            src={product.image || product.Image || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&q=80"}
+                                            alt={product.name || product.Name}
+                                            className="w-full h-full object-cover rounded-md group-hover:scale-110 transition-transform duration-700 ease-in-out"
+                                            loading="lazy"
+                                        />
+                                        <div className="absolute top-4 right-4 z-20">
+                                            <button className="bg-white/80 backdrop-blur-md text-gray-400 hover:text-rose-500 p-2.5 rounded-full shadow-sm hover:shadow-md transition-all duration-300">
+                                                <Heart className="w-5 h-5 fill-current opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                <Heart className="w-5 h-5 absolute inset-0 m-auto" />
+                                            </button>
                                         </div>
-                                    )}
 
-                                    {(product.stock || product.Stock || 0) <= 0 && (
-                                        <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-30 flex items-center justify-center">
-                                            <span className="bg-rose-600 text-white text-sm font-black uppercase tracking-widest py-2 px-4 rounded-lg shadow-xl -rotate-12">
-                                                Out of Stock
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Product Details */}
-                                <div className="p-6 flex flex-col flex-grow bg-white relative border-t border-gray-100">
-
-                                    {/* Header Info */}
-                                    <div className="mb-4">
-                                        {/* Seller Info */}
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <div className="w-6 h-6 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-[10px]">
-                                                {(product.sellerName || product.SellerName || 'S').charAt(0).toUpperCase()}
+                                        {(product.stock || product.Stock || 0) <= 5 && (product.stock || product.Stock || 0) > 0 && (
+                                            <div className="absolute top-4 left-4 z-20">
+                                                <span className="bg-amber-500 text-white text-[10px] font-black uppercase tracking-wider py-1.5 px-3 rounded-full shadow-md animate-pulse">
+                                                    Only {product.stock || product.Stock} Left
+                                                </span>
                                             </div>
-                                            <span className="text-xs font-semibold text-gray-500 tracking-wide uppercase">
-                                                {product.sellerName || product.SellerName || "Verified Seller"}
-                                            </span>
-                                        </div>
+                                        )}
 
-                                        {/* Title */}
-                                        <h3 className="text-xl font-extrabold text-gray-900 leading-snug line-clamp-2 mb-2 group-hover:text-indigo-600 transition-colors duration-300" title={product.name || product.Name}>
-                                            {product.name || product.Name}
-                                        </h3>
-
-                                        {/* Description */}
-                                        <p className="text-sm text-gray-500 line-clamp-3 leading-relaxed min-h-[3rem]" title={product.description || product.Description}>
-                                            {product.description || product.Description || "No product description provided."}
-                                        </p>
+                                        {(product.stock || product.Stock || 0) <= 0 && (
+                                            <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-30 flex items-center justify-center">
+                                                <span className="bg-rose-600 text-white text-sm font-black uppercase tracking-widest py-2 px-4 rounded-lg shadow-xl -rotate-12">
+                                                    Out of Stock
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* Footer Metadata */}
-                                    <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-5 mt-auto">
-                                        <div className="flex flex-col">
-                                            <span className="text-xs text-gray-400 font-semibold mb-0.5 uppercase tracking-wider">Price</span>
-                                            <span className="text-3xl font-black text-gray-900 tracking-tight">
-                                                <span className="text-lg align-top text-gray-500 mr-0.5">$</span>
-                                                {(product.price || product.Price || 0).toFixed(2)}
-                                            </span>
+                                    {/* Product Details */}
+                                    <div className="p-6 flex flex-col flex-grow bg-white relative border-t border-gray-100">
+
+                                        {/* Header Info */}
+                                        <div className="mb-4">
+                                            {/* Seller Info */}
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <div className="w-6 h-6 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-[10px]">
+                                                    {(product.sellerName || product.SellerName || 'S').charAt(0).toUpperCase()}
+                                                </div>
+                                                <span className="text-xs font-semibold text-gray-500 tracking-wide uppercase">
+                                                    {product.sellerName || product.SellerName || "Verified Seller"}
+                                                </span>
+                                            </div>
+
+                                            {/* Title */}
+                                            <h3 className="text-xl font-extrabold text-gray-900 leading-snug line-clamp-2 mb-2 group-hover:text-indigo-600 transition-colors duration-300" title={product.name || product.Name}>
+                                                {product.name || product.Name}
+                                            </h3>
+
+                                            {/* Description */}
+                                            <p className="text-sm text-gray-500 line-clamp-3 leading-relaxed min-h-[3rem]" title={product.description || product.Description}>
+                                                {product.description || product.Description || "No product description provided."}
+                                            </p>
                                         </div>
 
-                                        <div className="text-right flex flex-col items-end">
-                                            <span className="text-xs text-gray-400 font-semibold mb-1 uppercase tracking-wider">Availability</span>
-                                            <span className={`text-sm font-bold flex items-center gap-1.5 ${(product.stock || product.Stock || 0) > 0 ? "text-emerald-600" : "text-rose-500"}`}>
-                                                {(product.stock || product.Stock || 0) > 0 ? (
-                                                    <><CheckCircle className="w-4 h-4" /> {(product.stock || product.Stock)} In Stock</>
-                                                ) : (
-                                                    <><XCircle className="w-4 h-4" /> Sold Out</>
-                                                )}
-                                            </span>
+                                        {/* Footer Metadata */}
+                                        <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-5 mt-auto">
+                                            <div className="flex flex-col">
+                                                <span className="text-xs text-gray-400 font-semibold mb-0.5 uppercase tracking-wider">Price</span>
+                                                <span className="text-3xl font-black text-gray-900 tracking-tight">
+                                                    <span className="text-lg align-top text-gray-500 mr-0.5">$</span>
+                                                    {(product.price || product.Price || 0).toFixed(2)}
+                                                </span>
+                                            </div>
+
+                                            <div className="text-right flex flex-col items-end">
+                                                <span className="text-xs text-gray-400 font-semibold mb-1 uppercase tracking-wider">Availability</span>
+                                                <span className={`text-sm font-bold flex items-center gap-1.5 ${(product.stock || product.Stock || 0) > 0 ? "text-emerald-600" : "text-rose-500"}`}>
+                                                    {(product.stock || product.Stock || 0) > 0 ? (
+                                                        <><CheckCircle className="w-4 h-4" /> {(product.stock || product.Stock)} In Stock</>
+                                                    ) : (
+                                                        <><XCircle className="w-4 h-4" /> Sold Out</>
+                                                    )}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* CTA Add to Cart Button & Quantity */}
+                                        <div className="flex items-center gap-3">
+                                            {/* Quantity Selector */}
+                                            <div className="flex items-center bg-gray-50 rounded-xl border border-gray-200 p-1 shrink-0 h-[52px]">
+                                                <button
+                                                    onClick={() => handleQuantityChange(identifier, -1, product.Stock || product.stock || 0)}
+                                                    disabled={(quantities[identifier] || 1) <= 1 || (product.stock || product.Stock || 0) <= 0}
+                                                    className="w-10 h-full rounded-lg flex items-center justify-center text-gray-500 hover:bg-white hover:text-gray-900 hover:shadow-sm disabled:opacity-50 disabled:hover:bg-transparent transition-all"
+                                                >
+                                                    <span className="text-xl font-medium leading-none mb-1">-</span>
+                                                </button>
+                                                <span className="w-8 text-center font-bold text-gray-900 text-sm">
+                                                    {quantities[identifier] || 1}
+                                                </span>
+                                                <button
+                                                    onClick={() => handleQuantityChange(identifier, 1, product.Stock || product.stock || 0)}
+                                                    disabled={(quantities[identifier] || 1) >= (product.Stock || product.stock || 0)}
+                                                    className="w-10 h-full rounded-lg flex items-center justify-center text-gray-500 hover:bg-white hover:text-gray-900 hover:shadow-sm disabled:opacity-50 disabled:hover:bg-transparent transition-all"
+                                                >
+                                                    <span className="text-xl font-medium leading-none mb-0.5">+</span>
+                                                </button>
+                                            </div>
+
+                                            {/* Add to Cart Button */}
+                                            <button
+                                                key={product.id}
+                                                onClick={() => handleAddToCartClick(product)}
+                                                disabled={(product.stock || product.Stock || 0) <= 0}
+                                                className={`flex-grow flex items-center justify-center gap-2 h-[52px] px-4 rounded-xl font-bold transition-all duration-300 shadow-lg group/btn overflow-hidden relative
+                                                ${(product.stock || product.Stock || 0) > 0
+                                                        ? "bg-gray-900 hover:bg-indigo-600 text-white hover:shadow-indigo-500/30 hover:-translate-y-0.5"
+                                                        : "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
+                                                    }`}
+                                            >
+                                                <ShoppingCart className={`w-5 h-5 relative z-10 transition-transform ${(product.stock || product.Stock || 0) > 0 ? "group-hover/btn:-rotate-12 group-hover/btn:scale-110" : ""}`} />
+                                                <span className="relative z-10 tracking-wide text-sm whitespace-nowrap">{(product.stock || product.Stock || 0) > 0 ? "Add to Cart" : "Unavailable"}</span>
+                                            </button>
                                         </div>
                                     </div>
-
-                                    {/* CTA Add to Cart Button */}
-                                    <button
-                                        disabled={(product.stock || product.Stock || 0) <= 0}
-                                        className={`w-full flex items-center justify-center gap-3 py-3.5 px-4 rounded-xl font-bold transition-all duration-300 shadow-lg group/btn overflow-hidden relative
-                                            ${(product.stock || product.Stock || 0) > 0
-                                                ? "bg-gray-900 hover:bg-indigo-600 text-white hover:shadow-indigo-500/30 hover:-translate-y-0.5"
-                                                : "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none"
-                                            }`}
-                                    >
-                                        <ShoppingCart className={`w-5 h-5 relative z-10 transition-transform ${(product.stock || product.Stock || 0) > 0 ? "group-hover/btn:-rotate-12 group-hover/btn:scale-110" : ""}`} />
-                                        <span className="relative z-10 tracking-wide">{(product.stock || product.Stock || 0) > 0 ? "Add to Cart" : "Currently Unavailable"}</span>
-                                    </button>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

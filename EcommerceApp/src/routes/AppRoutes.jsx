@@ -10,6 +10,7 @@ import SignupPage from '../pages/SignupPage';
 import UserDashboard from '../pages/UserDashboard';
 import SellerDashboard from '../pages/SellerDashboard';
 import AdminDashboard from '../pages/AdminDashboard';
+import CartPage from '../pages/CartPage';
 
 const AppRoutes = () => {
     const { isAuthenticated, user } = useSelector(state => state.auth);
@@ -20,6 +21,7 @@ const AppRoutes = () => {
             <Route element={<MainLayout />}>
                 <Route path="/" element={<Navigate to="/login" />} />
                 <Route path="/home" element={isAuthenticated ? <UserDashboard /> : <Navigate to="/login" />} />
+                <Route path="/cart" element={isAuthenticated ? <CartPage /> : <Navigate to="/login" />} />
                 <Route path="/seller/dashboard" element={isAuthenticated && role === 'Seller' ? <SellerDashboard /> : <Navigate to="/login" />} />
                 <Route path="/admin/dashboard" element={isAuthenticated && role === 'Admin' ? <AdminDashboard /> : <Navigate to="/login" />} />
                 <Route path="/login" element={isAuthenticated ? <Navigate to={role === 'Seller' ? "/seller/dashboard" : role === 'Admin' ? "/admin/dashboard" : "/home"} /> : <LoginPage />} />

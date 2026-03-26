@@ -1,16 +1,60 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { ShoppingCart, Heart, User, LogOut, Menu } from 'lucide-react';
 import { logout } from '../redux/slices/authSlice';
+import { setCart, clearCart } from '../redux/slices/cartSlice';
+import { getCartAPI } from '../services/cartService';
+import { ShoppingCart, Heart, User, LogOut, Menu } from 'lucide-react';
 
 const Navbar = () => {
     const { isAuthenticated, user } = useSelector(state => state.auth);
+    const cartItems = useSelector(state => state.cart.cartItems);
+    const cartTotalItems = cartItems.reduce((acc, item) => acc + (item.Quantity || item.quantity || 0), 0);
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
+    // Rehydrate cart from API when user logs in or site loads
+    useEffect(() => {
+        const fetchCart = async () => {
+            const userId = user?.id || user?.Id;
+            if (isAuthenticated && userId) {
+                try {
+                    const dbCart = await getCartAPI(userId);
+                    // Defensive mapping ensuring standard shape with ProductId + product object
+                    if (Array.isArray(dbCart)) {
+                        const mappedCart = dbCart.map(item => {
+                            // Backend returning fields directly (e.g. ProductName, Quantity, Price)
+                            // We assemble a complete 'product' object so CartPage renders it
+                            const productId = item.id || null;
+                            const productPart = item.product || item.Product || {
+                                Id: productId, // VITAL: API MUST return ProductId!
+                                Name: item.productName || item.ProductName || item.name || "Unknown Product",
+                                Price: item.price || item.Price || 0,
+                                Description: item.description || item.Description || item.productDescription || "No description provided.",
+                                ...item // Keep any other raw props just in case
+                            }; 
+                            return {
+                                UserId: item.UserId || item.userId,
+                                ProductId: productId,
+                                Quantity: item.Quantity || item.quantity || 1,
+                                Description: item.Description || item.description || item.productDescription || '',
+                                product: productPart
+                            };
+                        });
+                        dispatch(setCart(mappedCart));
+                    }
+                } catch (error) {
+                    console.error('Failed to load initial cart data from API:', error);
+                }
+            }
+        };
+
+        fetchCart();
+    }, [isAuthenticated, user?.id, user?.Id, dispatch]);
+
     const handleLogout = () => {
         dispatch(logout());
+        dispatch(clearCart());
         navigate('/login');
     };
 
@@ -43,6 +87,17 @@ const Navbar = () => {
                                     {user?.role === 'Seller' && (
                                         <Link to="/seller/dashboard" className="text-sm font-medium text-gray-600 hover:text-primary-600">Seller</Link>
                                     )}
+
+                                    {/* Cart Icon */}
+                                    <Link to="/cart" className="relative p-2 text-gray-600 hover:text-primary-600 transition-colors">
+                                        <ShoppingCart size={20} />
+                                        {cartTotalItems > 0 && (
+                                            <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                                                {cartTotalItems}
+                                            </span>
+                                        )}
+                                    </Link>
+
                                     <div className="flex items-center gap-2 border-l pl-4 border-gray-200">
                                         <span className="text-sm font-medium text-gray-700">{user?.name}</span>
                                         <button
@@ -63,8 +118,18 @@ const Navbar = () => {
                         </div>
                     </div>
 
-                    {/* Mobile Menu Button */}
-                    <div className="md:hidden flex items-center">
+                    {/* Mobile Menu Button  & Cart Icon */}
+                    <div className="md:hidden flex items-center gap-4">
+                        {isAuthenticated && (
+                            <Link to="/cart" className="relative p-2 text-gray-600 hover:text-primary-600 transition-colors">
+                                <ShoppingCart size={20} />
+                                {cartTotalItems > 0 && (
+                                    <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                                        {cartTotalItems}
+                                    </span>
+                                )}
+                            </Link>
+                        )}
                         <button className="text-gray-500 hover:text-gray-700 p-2">
                             <Menu size={24} />
                         </button>
