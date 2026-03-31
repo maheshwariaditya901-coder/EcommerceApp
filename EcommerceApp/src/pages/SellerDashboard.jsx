@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { Plus, Edit2, Trash2, X, Search, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Search, CheckCircle, Clock, AlertCircle, XCircle } from 'lucide-react';
 import { getSellerProducts, addProduct, updateProduct, deleteProduct } from '../services/productService';
 
 const SellerDashboard = () => {
@@ -17,7 +17,9 @@ const SellerDashboard = () => {
         description: '',
         price: '',
         stock: '',
-        userId: user?.id || ''
+        userId: user?.id || '',
+        status: 'Pending',
+        image: ''
     });
 
     // --- FETCH PRODUCTS FROM API ---
@@ -49,23 +51,35 @@ const SellerDashboard = () => {
     const handleOpenModal = (mode, product = null) => {
         setModalMode(mode);
         if (mode === 'edit' && product) {
-            setCurrentProduct({
-                id: product.id || product.Id,
-                name: product.name || product.Name || '',
-                description: product.description || product.Description || '',
-                price: product.price || product.Price || '',
-                stock: product.stock || product.Stock || '',
-                userId: product.userId || product.UserId || user?.id || ''
-            });
-        } else {
-            setCurrentProduct({
-                name: '',
-                description: '',
-                price: '',
-                stock: '',
-                userId: user?.id || ''
-            });
+            const normalizedStatus = (product.status || product.Status || 'Pending').toLowerCase();
+            if (normalizedStatus === 'rejected') {
+                alert("Rejected products cannot be edited.");
+                return;
+            }
+
+                setCurrentProduct({
+                    id: product.id || product.Id,
+                    name: product.name || product.Name || '',
+                    description: product.description || product.Description || '',
+                    price: product.price || product.Price || '',
+                    stock: product.stock || product.Stock || '',
+                    userId: product.userId || product.UserId || user?.id || '',
+                    status: product.status || product.Status || 'Pending',
+                    image: product.image || product.Image || product.imageUrl || product.ImageUrl || ''
+                });
+            setIsModalOpen(true);
+            return;
         }
+
+        setCurrentProduct({
+            name: '',
+            description: '',
+            price: '',
+            stock: '',
+            userId: user?.id || '',
+            status: 'Pending',
+            image: ''
+        });
         setIsModalOpen(true);
     };
 
@@ -76,10 +90,18 @@ const SellerDashboard = () => {
     const handleSaveProduct = async (e) => {
         e.preventDefault();
 
+        if (modalMode === 'edit' && currentProduct.status?.toLowerCase() === 'rejected') {
+            alert("Rejected products cannot be edited.");
+            return;
+        }
+
         if (!currentProduct.name || !currentProduct.description || !currentProduct.price || !currentProduct.stock) {
             alert("Please fill in all required fields.");
             return;
         }
+
+        const normalizedImage = currentProduct.image?.trim() || '';
+        console.log(currentProduct.image);
 
         try {
             if (modalMode === 'add') {
@@ -88,7 +110,8 @@ const SellerDashboard = () => {
                     description: currentProduct.description,
                     price: parseFloat(currentProduct.price),
                     stock: parseInt(currentProduct.stock, 10),
-                    userId: parseInt(currentProduct.userId, 10)
+                    userId: parseInt(currentProduct.userId, 10),
+                    ImageUrl: normalizedImage,
                     // Status is typically set to 'Pending' automatically by the Backend.
                 };
 
@@ -101,6 +124,10 @@ const SellerDashboard = () => {
                     description: currentProduct.description,
                     price: parseFloat(currentProduct.price),
                     stock: parseInt(currentProduct.stock, 10),
+                    image: normalizedImage,
+                    Image: normalizedImage,
+                    imageUrl: normalizedImage,
+                    ImageUrl: normalizedImage
                 };
 
                 await updateProduct(currentProduct.id, updatePayload);
@@ -131,6 +158,7 @@ const SellerDashboard = () => {
         const s = status?.toLowerCase() || 'pending';
         if (s === 'approved') return <CheckCircle className="w-4 h-4 text-emerald-500" />;
         if (s === 'rejected') return <AlertCircle className="w-4 h-4 text-rose-500" />;
+        if (s === 'disabled') return <XCircle className="w-4 h-4 text-slate-500" />;
         return <Clock className="w-4 h-4 text-amber-500" />;
     };
 
@@ -138,6 +166,7 @@ const SellerDashboard = () => {
         const s = status?.toLowerCase() || 'pending';
         if (s === 'approved') return "bg-emerald-50 text-emerald-700 border-emerald-200";
         if (s === 'rejected') return "bg-rose-50 text-rose-700 border-rose-200";
+        if (s === 'disabled') return "bg-slate-50 text-slate-700 border-slate-200";
         return "bg-amber-50 text-amber-700 border-amber-200";
     };
 
@@ -178,6 +207,9 @@ const SellerDashboard = () => {
                     <tbody className="divide-y divide-gray-100">
                         {productList.map((product) => {
                             const currentStatus = product.status || product.Status || 'Pending';
+                            const normalizedStatus = currentStatus.toLowerCase();
+                            const statusLabel = currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1);
+                            const isRejected = normalizedStatus === 'rejected';
                             return (
                                 <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
                                     <td className="px-6 py-4">
@@ -193,15 +225,16 @@ const SellerDashboard = () => {
                                     <td className="px-6 py-4">
                                         <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusBadgeClass(currentStatus)}`}>
                                             {getStatusIcon(currentStatus)}
-                                            {currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}
+                                            {statusLabel}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end gap-2">
                                             <button
                                                 onClick={() => handleOpenModal('edit', product)}
-                                                className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                                title="Edit Product"
+                                                disabled={isRejected}
+                                                className={`p-2 rounded-lg transition-colors ${isRejected ? 'text-gray-300 cursor-not-allowed hover:bg-transparent' : 'text-gray-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                                title={isRejected ? "Rejected products cannot be edited" : "Edit Product"}
                                             >
                                                 <Edit2 className="w-4 h-4" />
                                             </button>
@@ -315,6 +348,18 @@ const SellerDashboard = () => {
                                         rows="3"
                                         className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none"
                                     ></textarea>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Image URL <span className="text-rose-500">*</span></label>
+                                    <input
+                                        type="url"
+                                        required
+                                        value={currentProduct.image}
+                                        onChange={(e) => setCurrentProduct({ ...currentProduct, image: e.target.value })}
+                                        placeholder="https://example.com/product.jpg"
+                                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                    />
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

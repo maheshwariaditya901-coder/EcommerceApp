@@ -11,6 +11,7 @@ const UserDashboard = () => {
     const [products, setProducts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [quantities, setQuantities] = useState({});
+    const [searchTerm, setSearchTerm] = useState('');
 
     const handleQuantityChange = (productId, delta, maxStock) => {
         setQuantities(prev => {
@@ -64,7 +65,7 @@ const UserDashboard = () => {
 
                 // Parse correctly whether it returns an array directly or wraps it inside `.data`
                 const allProducts = Array.isArray(productsResponse) ? productsResponse : (productsResponse?.data || productsResponse?.products || []);
-
+                console.log(allProducts);
                 setProducts(allProducts);
                 setIsLoading(false);
 
@@ -80,6 +81,16 @@ const UserDashboard = () => {
         fetchDashboardData();
     }, []);
 
+    const filteredProducts = React.useMemo(() => {
+        const query = searchTerm.trim().toLowerCase();
+        if (!query) return products;
+        const tokens = query.split(/\s+/).filter(Boolean);
+        return products.filter((product) => {
+            const name = (product.name || product.Name || '').toLowerCase();
+            if (!name) return false;
+            return tokens.some((token) => name.includes(token));
+        });
+    }, [products, searchTerm]);
 
 
     return (
@@ -102,6 +113,8 @@ const UserDashboard = () => {
                                 type="text"
                                 className="block w-full pl-11 pr-4 py-3 border-transparent rounded-full text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent sm:text-sm shadow-sm transition-all duration-300 bg-white/95"
                                 placeholder="Search for products..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
                     </div>
@@ -132,7 +145,7 @@ const UserDashboard = () => {
                             </div>
                         ))}
                     </div>
-                ) : products.length === 0 ? (
+                ) : filteredProducts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-3xl border border-gray-100 shadow-sm block">
                         <div className="bg-gray-50 p-6 rounded-full inline-block mb-4">
                             <Search className="w-12 h-12 text-gray-400" />
@@ -142,7 +155,7 @@ const UserDashboard = () => {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                        {products.map((product, idx) => {
+                        {filteredProducts.map((product, idx) => {
                             const identifier = product.id || product.Id || product.name || product.Name || idx;
                             return (
                                 <div
@@ -153,8 +166,8 @@ const UserDashboard = () => {
                                     <div className="relative h-64 w-full bg-gray-50 flex items-center justify-center p-6 overflow-hidden">
                                         <div className="absolute inset-0 bg-gradient-to-t from-gray-900/5 to-transparent z-10"></div>
                                         <img
-                                            src={product.image || product.Image || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&q=80"}
-                                            alt={product.name || product.Name}
+                                            src={product.imageUrl || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&q=80"}
+                                            alt={product.Name}
                                             className="w-full h-full object-cover rounded-md group-hover:scale-110 transition-transform duration-700 ease-in-out"
                                             loading="lazy"
                                         />

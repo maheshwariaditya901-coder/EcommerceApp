@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, UserPlus, LogIn, Store, Shield } from 'lucide-react';
 import { loginStart, loginSuccess, loginFailure } from '../redux/slices/authSlice';
-import { registerUser } from '../services/authService';
+import { registerUser, loginUser } from '../services/authService';
 import Loader from '../components/Loader';
 
 const SignupPage = () => {
@@ -52,15 +52,26 @@ const SignupPage = () => {
         dispatch(loginStart());
         try {
             const response = await registerUser(formData);
-            dispatch(loginSuccess(response.data));
+            let user = response?.data?.user || response?.data;
 
-            const role = response.data.user.role;
+            // If register response doesn't include a usable user, fallback to login
+            if (!user?.id && !user?.Id) {
+                const loginResponse = await loginUser({ email: formData.email, password: formData.password });
+                if (!loginResponse.success) {
+                    throw new Error(loginResponse.message || 'Login failed after registration');
+                }
+                user = loginResponse.user;
+            }
+
+            dispatch(loginSuccess(user));
+
+            const role = user?.role;
             if (role === 'Admin') navigate('/admin/dashboard');
             else if (role === 'Seller') navigate('/seller/dashboard');
             else navigate('/home');
 
         } catch (err) {
-            dispatch(loginFailure(err.response?.data?.message || 'Registration failed'));
+            dispatch(loginFailure(err.response?.data?.message || err.message || 'Registration failed'));
         }
     };
 

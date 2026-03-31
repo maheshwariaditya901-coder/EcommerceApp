@@ -29,7 +29,6 @@ export const getSellerProducts = async (userId) => {
 export const addProduct = async (productData) => {
     try {
         const response = await api.post("/Products/AddProduct", productData);
-        console.log(response.data);
         return response.data;
     } catch (error) {
         console.error("Error adding product:", error);

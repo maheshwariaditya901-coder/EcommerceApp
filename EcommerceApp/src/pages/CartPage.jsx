@@ -1,15 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, ShoppingCart, ArrowLeft, CreditCard } from 'lucide-react';
 import { removeFromCart, clearCart } from '../redux/slices/cartSlice';
 import { removeCartItemAPI, clearCartAPI } from '../services/cartService';
+import { checkout } from '../services/orderService';
 
 const CartPage = () => {
     const { cartItems } = useSelector(state => state.cart);
     const { user } = useSelector(state => state.auth);
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const [isCheckingOut, setIsCheckingOut] = useState(false);
+    const [checkoutError, setCheckoutError] = useState('');
 
     const userId = user?.id || user?.Id;
     
@@ -40,6 +43,24 @@ const CartPage = () => {
             }
         } catch (error) {
             console.warn('API clear cart failed.');
+        }
+    };
+
+    const handleCheckout = async () => {
+        if (!userId) {
+            setCheckoutError('User ID missing. Please login again.');
+            return;
+        }
+        setCheckoutError('');
+        setIsCheckingOut(true);
+        try {
+            const result = await checkout(userId);
+            dispatch(clearCart());
+            const orderId = result?.orderId;
+        } catch (error) {
+            setCheckoutError('Checkout failed. Please try again.');
+        } finally {
+            setIsCheckingOut(false);
         }
     };
 
@@ -186,9 +207,23 @@ const CartPage = () => {
                                 <p className="text-xs text-gray-400 mt-1 text-right">Including VAT</p>
                             </div>
 
-                            <button className="w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-primary-600 text-white px-6 py-4 rounded-xl font-bold transition-all shadow-lg hover:shadow-primary-500/30 hover:-translate-y-0.5 group">
+                            {checkoutError && (
+                                <div className="mb-4 text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+                                    {checkoutError}
+                                </div>
+                            )}
+
+                            <button
+                                onClick={handleCheckout}
+                                disabled={isCheckingOut || cartItems.length === 0}
+                                className={`w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-bold transition-all shadow-lg group
+                                ${isCheckingOut || cartItems.length === 0
+                                        ? "bg-gray-200 text-gray-500 cursor-not-allowed shadow-none"
+                                        : "bg-gray-900 hover:bg-primary-600 text-white hover:shadow-primary-500/30 hover:-translate-y-0.5"
+                                    }`}
+                            >
                                 <CreditCard className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                                Proceed to Checkout
+                                {isCheckingOut ? 'Processing...' : 'Proceed to Checkout'}
                             </button>
 
                             <div className="mt-4 flex justify-center">

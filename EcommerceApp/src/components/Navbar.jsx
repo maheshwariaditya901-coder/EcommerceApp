@@ -10,6 +10,7 @@ const Navbar = () => {
     const { isAuthenticated, user } = useSelector(state => state.auth);
     const cartItems = useSelector(state => state.cart.cartItems);
     const cartTotalItems = cartItems.reduce((acc, item) => acc + (item.Quantity || item.quantity || 0), 0);
+    const isCustomer = user?.role === 'User';
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
@@ -88,15 +89,21 @@ const Navbar = () => {
                                         <Link to="/seller/dashboard" className="text-sm font-medium text-gray-600 hover:text-primary-600">Seller</Link>
                                     )}
 
+                                    {isCustomer && (
+                                        <Link to="/orders" className="text-sm font-medium text-gray-600 hover:text-primary-600">Order History</Link>
+                                    )}
+
                                     {/* Cart Icon */}
-                                    <Link to="/cart" className="relative p-2 text-gray-600 hover:text-primary-600 transition-colors">
-                                        <ShoppingCart size={20} />
-                                        {cartTotalItems > 0 && (
-                                            <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
-                                                {cartTotalItems}
-                                            </span>
-                                        )}
-                                    </Link>
+                                    {isCustomer && (
+                                        <Link to="/cart" className="relative p-2 text-gray-600 hover:text-primary-600 transition-colors">
+                                            <ShoppingCart size={20} />
+                                            {cartTotalItems > 0 && (
+                                                <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                                                    {cartTotalItems}
+                                                </span>
+                                            )}
+                                        </Link>
+                                    )}
 
                                     <div className="flex items-center gap-2 border-l pl-4 border-gray-200">
                                         <span className="text-sm font-medium text-gray-700">{user?.name}</span>
@@ -120,7 +127,10 @@ const Navbar = () => {
 
                     {/* Mobile Menu Button  & Cart Icon */}
                     <div className="md:hidden flex items-center gap-4">
-                        {isAuthenticated && (
+                        {isAuthenticated && isCustomer && (
+                            <Link to="/orders" className="text-sm font-medium text-gray-600 hover:text-primary-600">Order History</Link>
+                        )}
+                        {isAuthenticated && isCustomer && (
                             <Link to="/cart" className="relative p-2 text-gray-600 hover:text-primary-600 transition-colors">
                                 <ShoppingCart size={20} />
                                 {cartTotalItems > 0 && (

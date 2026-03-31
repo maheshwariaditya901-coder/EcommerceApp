@@ -15,6 +15,37 @@ const AdminDashboard = () => {
     const [sellerProducts, setSellerProducts] = useState([]);
     const [isProductsLoading, setIsProductsLoading] = useState(false);
     const [pendingStatusUpdates, setPendingStatusUpdates] = useState({});
+    const productStatusOptions = [
+        { value: 'pending', label: 'Pending' },
+        { value: 'approved', label: 'Approved' },
+        { value: 'rejected', label: 'Rejected' },
+        { value: 'disabled', label: 'Disabled' }
+    ];
+    const productStatusMeta = {
+        pending: {
+            badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
+            Icon: Clock,
+            label: 'Pending'
+        },
+        approved: {
+            badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+            Icon: CheckCircle,
+            label: 'Approved'
+        },
+        rejected: {
+            badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
+            Icon: AlertCircle,
+            label: 'Rejected'
+        },
+        disabled: {
+            badgeClass: 'bg-slate-50 text-slate-700 border-slate-200',
+            Icon: XCircle,
+            label: 'Disabled'
+        }
+    };
+    const getProductStatusMeta = (status) => {
+        return productStatusMeta[status] || productStatusMeta.pending;
+    };
 
     // --- API INTEGRATION ---
     useEffect(() => {
@@ -86,7 +117,20 @@ const AdminDashboard = () => {
         }
     };
 
-    const handleStatusSelection = (productId, newStatus) => {
+    const handleStatusSelection = (productId, newStatus, originalStatus) => {
+        if (originalStatus === 'rejected') {
+            return;
+        }
+
+        if (newStatus === originalStatus) {
+            setPendingStatusUpdates(prev => {
+                const updated = { ...prev };
+                delete updated[productId];
+                return updated;
+            });
+            return;
+        }
+
         setPendingStatusUpdates(prev => ({
             ...prev,
             [productId]: newStatus
@@ -117,9 +161,14 @@ const AdminDashboard = () => {
         }
     };
 
-    const submitStatusChange = async (productId) => {
+    const submitStatusChange = async (productId, originalStatus) => {
+        if (originalStatus === 'rejected') {
+            alert("Rejected products cannot be modified.");
+            return;
+        }
+
         const newStatus = pendingStatusUpdates[productId];
-        if (!newStatus) return;
+        if (!newStatus || newStatus === originalStatus) return;
 
         try {
             // Actively update db via API call
@@ -350,17 +399,9 @@ const AdminDashboard = () => {
                                                 const originalStatus = (product.status || product.Status || 'Pending').toLowerCase();
                                                 const currentStatus = pendingStatusUpdates[product.id] || originalStatus;
                                                 const hasChanged = pendingStatusUpdates[product.id] && pendingStatusUpdates[product.id] !== originalStatus;
-
-                                                let badgeClass = "bg-amber-50 text-amber-700 border-amber-200";
-                                                let Icon = Clock;
-
-                                                if (currentStatus === 'approved') {
-                                                    badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                                                    Icon = CheckCircle;
-                                                } else if (currentStatus === 'rejected') {
-                                                    badgeClass = "bg-rose-50 text-rose-700 border-rose-200";
-                                                    Icon = AlertCircle;
-                                                }
+                                                const isRejected = originalStatus === 'rejected';
+                                                const statusMeta = getProductStatusMeta(currentStatus);
+                                                const StatusIcon = statusMeta.Icon;
 
                                                 return (
                                                     <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
@@ -374,22 +415,28 @@ const AdminDashboard = () => {
                                                         </td>
                                                         <td className="px-6 py-4 align-top text-right">
                                                             <div className="flex flex-col items-end gap-2">
-                                                                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeClass}`}>
-                                                                    <Icon className="w-3.5 h-3.5" />
-                                                                    <select
-                                                                        value={currentStatus}
-                                                                        onChange={(e) => handleStatusSelection(product.id, e.target.value)}
-                                                                        className="bg-transparent appearance-none outline-none cursor-pointer pr-4 uppercase tracking-wider"
-                                                                        style={{ backgroundImage: `url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>')`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right center' }}
-                                                                    >
-                                                                        <option value="pending" className="text-amber-800 bg-amber-50">Pending</option>
-                                                                        <option value="approved" className="text-emerald-800 bg-emerald-50">Approved</option>
-                                                                        <option value="rejected" className="text-rose-800 bg-rose-50">Rejected</option>
-                                                                    </select>
+                                                                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${statusMeta.badgeClass}`}>
+                                                                    <StatusIcon className="w-3.5 h-3.5" />
+                                                                    {!isRejected ? (
+                                                                        <select
+                                                                            value={currentStatus}
+                                                                            onChange={(e) => handleStatusSelection(product.id, e.target.value, originalStatus)}
+                                                                            className="bg-transparent appearance-none outline-none cursor-pointer pr-4 uppercase tracking-wider"
+                                                                            style={{ backgroundImage: `url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>')`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right center' }}
+                                                                        >
+                                                                            {productStatusOptions.map(option => (
+                                                                                <option key={option.value} value={option.value} className={`uppercase tracking-wider ${option.value === 'pending' ? 'text-amber-800 bg-amber-50' : option.value === 'approved' ? 'text-emerald-800 bg-emerald-50' : option.value === 'rejected' ? 'text-rose-800 bg-rose-50' : 'text-slate-700 bg-slate-50'}`}>
+                                                                                    {option.label}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                    ) : (
+                                                                        <span className="text-xs font-semibold uppercase tracking-wider">{statusMeta.label}</span>
+                                                                    )}
                                                                 </div>
-                                                                {hasChanged && (
+                                                                {hasChanged && !isRejected && (
                                                                     <button
-                                                                        onClick={() => submitStatusChange(product.id)}
+                                                                        onClick={() => submitStatusChange(product.id, originalStatus)}
                                                                         className="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors shadow-sm animate-in zoom-in-95 duration-200"
                                                                     >
                                                                         Submit Changes

@@ -11,17 +11,44 @@ import UserDashboard from '../pages/UserDashboard';
 import SellerDashboard from '../pages/SellerDashboard';
 import AdminDashboard from '../pages/AdminDashboard';
 import CartPage from '../pages/CartPage';
+import OrderSuccess from '../pages/OrderSuccess';
+import OrderHistory from '../pages/OrderHistory';
 
 const AppRoutes = () => {
     const { isAuthenticated, user } = useSelector(state => state.auth);
     const role = user?.role;
+    const authenticatedRedirect = role === 'Seller' ? '/seller/dashboard' : role === 'Admin' ? '/admin/dashboard' : '/home';
+    const defaultRedirect = isAuthenticated ? authenticatedRedirect : '/login';
 
     return (
         <Routes>
             <Route element={<MainLayout />}>
                 <Route path="/" element={<Navigate to="/login" />} />
                 <Route path="/home" element={isAuthenticated ? <UserDashboard /> : <Navigate to="/login" />} />
-                <Route path="/cart" element={isAuthenticated ? <CartPage /> : <Navigate to="/login" />} />
+                <Route
+                    path="/cart"
+                    element={isAuthenticated && role === 'User' ? (
+                        <CartPage />
+                    ) : (
+                        <Navigate to={defaultRedirect} />
+                    )}
+                />
+                <Route
+                    path="/orders"
+                    element={isAuthenticated && role === 'User' ? (
+                        <OrderHistory />
+                    ) : (
+                        <Navigate to={defaultRedirect} />
+                    )}
+                />
+                <Route
+                    path="/order-success"
+                    element={isAuthenticated && role === 'User' ? (
+                        <OrderSuccess />
+                    ) : (
+                        <Navigate to={defaultRedirect} />
+                    )}
+                />
                 <Route path="/seller/dashboard" element={isAuthenticated && role === 'Seller' ? <SellerDashboard /> : <Navigate to="/login" />} />
                 <Route path="/admin/dashboard" element={isAuthenticated && role === 'Admin' ? <AdminDashboard /> : <Navigate to="/login" />} />
                 <Route path="/login" element={isAuthenticated ? <Navigate to={role === 'Seller' ? "/seller/dashboard" : role === 'Admin' ? "/admin/dashboard" : "/home"} /> : <LoginPage />} />
